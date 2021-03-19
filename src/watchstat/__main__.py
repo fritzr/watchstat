@@ -169,9 +169,9 @@ def make_command_callback(command_argv, interp=None, force=False):
     return command_callback
 
 
-def main(*args):
+def main():
     global stat_info
-    opts = parse_args(args)
+    opts = parse_args(sys.argv[1:])
 
     argv = [opts.command] + (opts.args or [])
     command_callback = make_command_callback(argv, opts.interp, opts.force)
@@ -223,4 +223,4 @@ def main(*args):
 
 
 if __name__ == "__main__":
-    sys.exit(main(*sys.argv[1:]))
+    sys.exit(main())
