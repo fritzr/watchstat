@@ -287,7 +287,8 @@ def main():
 
     # With --initial-run, run the command before beginning the watch.
     if opts.initial_run:
-        callback(set(), None, os.stat(opts.path))
+        for path, watchlist in opts.watch.items():
+            callback(path, set(watchlist), None, os.stat(path))
 
     try:
         watchstat(
