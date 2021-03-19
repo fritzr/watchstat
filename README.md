@@ -2,9 +2,11 @@
 
 Execute a command whenever a file's status changes.
 
+## Installation
+
 May be installed via `pip install watchstat`.
 
-Usage is as follows:
+## Usage
 
 ```
 usage: __main__.py [-h] [-v] [-m PATH] [-a PATH] [-c PATH] [-d PATH] [-i PATH]
@@ -60,3 +62,73 @@ Positional arguments:
   command               Command to run when status changes.
   args                  Args passed to command. Interpreted specially with -I.
 ```
+
+## Examples
+
+Examples are shown using `bash` syntax to perform different behaviors based on
+the exit status of `watchstat`.
+
+* Re-compile a file whenever it is changed:
+
+  ```sh
+  watchstat --force -m test.c -- gcc -Wall -pedantic test.c -o test
+  ```
+
+  By default, `watchstat` cancels if the command fails, so to continue even
+  after a compile error we use `--force` (`-f`) which implies `--retry` and
+  `-limit=0` (retry forever). To exit `watchstat` gracefully, issue an interrupt
+  with Ctrl+C.
+
+* Compile a file if it changes in the next 5 seconds:
+
+  ```sh
+  if ! watchstat -m test.c --timeout 5 -- gcc test.c -o test 2>/dev/null; then
+    echo "compile errors detected"
+  fi
+  ```
+
+  - If the file does not change within 5 seconds, nothing is done.
+  - If the file does change, the gcc command is run.
+  - If the file changes and gcc runs but fails, "compile errors detected"
+    is echoed.
+
+* Echo whether a file changes in the next five seconds:
+
+  ```sh
+  if ! watchstat -m test.c --softtimeout 5 echo "File updated"; then
+    echo "Timed out"
+  fi
+  ```
+
+  - If the file is changed in the next 5 seconds, echoes "File updated".
+  - If the file is not changed in the next 5 seconds, echoes "Timed out".
+
+* Display the contents of a file when it is created:
+
+  ```sh
+  watchstat --retry -c pid.txt cat pid.txt
+  ```
+
+  Without `--retry` (`-r`), `watchstat` would fail if the file doesn't exist
+  after the first poll time interval.
+
+* A more descriptive echo when the file size changes using interpolation:
+
+  ```sh
+  $ watchstat -r -0 -s resizeme.txt -I% echo "Size of %path% is %size% bytes"
+  Size of /home/user/resizeme.txt is 0 bytes
+  Size of /home/user/resizeme.txt is 118 bytes
+  ```
+
+  With `--initial-run` (`-0`), the message is also displayed *now*
+  (as soon as `watchstat` runs).
+
+* Note a pretty mtime every time a file changes using shell constructs,
+  with a poll time of only 5 seconds:
+
+  ```sh
+  $ watchstat -l0 -t5000 -m README.md -IX \
+    -- bash -c date -r "XpathX" +"$(basename XpathX) changed at %F-%T.%N"
+  README.md changed at 2021-03-19-13:53:15.791771219
+  README.md changed at 2021-03-19-13:53:32.801771159
+  ```
