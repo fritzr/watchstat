@@ -59,6 +59,4 @@ General options:
 Positional arguments:
   command               Command to run when status changes.
   args                  Args passed to command. Interpreted specially with -I.
-
-If no options are selected, default is to watch mtime.
 ```

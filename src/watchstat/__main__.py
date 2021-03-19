@@ -34,7 +34,6 @@ class WatchAction(argparse.Action):
 def parse_args(args):
     p = argparse.ArgumentParser(
         description="Execute a command whenever a file's status changes.",
-        epilog="If no options are selected, default is to watch mtime.",
     )
 
     p.add_argument(
