@@ -3,7 +3,12 @@ import sys
 import argparse
 import subprocess
 
-from . import stat_info, rstat_info, watchstat
+from . import stat_info, rstat_info, watchstat, Timeout, SoftTimeout
+
+try:
+    from StringIO import StringIO
+except Exception:
+    from io import StringIO
 
 
 class WatchAction(argparse.Action):
@@ -137,13 +142,84 @@ def parse_args(args):
     return opts
 
 
-def quote_argv(argv):
-    try:
-        from six.moves import shlex_quote, map
-    except Exception:
-        from shlex import quote as shlex_quote
+def find_tokens(string, delim):
+    """Return an iterator over delim|key|delim tokens in string.
 
-    return " ".join(map(shlex_quote, argv))
+    Each item from the iterator is (offset, key) where offset is the offset
+    of the start of the token in the string. (The end offset of the token can
+    be computed as 'offset + len(key) + 2*len(delim)' if necessary).
+    """
+    delim_length = len(delim)
+    # Start of the next token.
+    delim_offset = string.find(delim)
+    while delim_offset >= 0:
+        # Start of the current token.
+        token_offset = delim_offset
+
+        # Start of the key within the token.
+        key_offset = token_offset + delim_length
+
+        # Find the next delimiter. This ends the token.
+        delim_offset = string.find(delim, key_offset)
+
+        # Error if there is no matching delimiter.
+        if delim_offset < 0:
+            raise ValueError("delimiter mismatch")
+
+        # Extract the key from the string.
+        # Ignore repeated delimiters (empty keys).
+        if delim_offset != key_offset:
+            yield token_offset, string[key_offset:delim_offset]
+
+        # Find the start of the next delimiter pair.
+        delim_offset = string.find(delim, delim_offset + delim_length)
+
+
+def interpolate_argument(string, delim, status, **extra_keys):
+    """Interpolate a single argument string containing delim|X|delim tokens.
+
+    Replaces such tokens with status[F], where F is the field corresponding
+    to the stat key X. The delimiter can be escaped by repeating it.
+
+    Raises ValueError if the string is invalid (i.e. mismatched delimiters).
+    """
+    # Result of interpolation.
+    interp = StringIO()
+
+    # Interpolate the string from the delimiters.
+    last_offset = 0
+    for offset, key in find_tokens(string, delim):
+        # Copy the next portion containing no tokens.
+        interp.write(string[last_offset:offset])
+
+        # Interpolate the token.
+        if key:
+            if key.lower() in rstat_info:
+                field = rstat_info[key]
+                interp.write(repr(status[field]))
+            elif key in extra_keys:
+                interp.write(extra_keys[key.lower()])
+            else:
+                raise ValueError("bad stat key {0!r}".format(key))
+
+        # Skip the token.
+        last_offset = offset + len(key) + 2 * len(delim)
+
+    # Copy the final portion containing no tokens.
+    interp.write(string[last_offset:])
+    return interp.getvalue()
+
+
+def interpolate_argument_vector(argv, delim, status, **keys):
+    """Interpolate stat values from argv with args containing delim|X|delim.
+
+    Doesn't interpolate the command name (argv[0]).
+
+    Extra keyword arguments are substituted directly if present.
+    """
+    return [argv[0]] + [
+        interpolate_argument(arg, delim, status, **keys) for arg in argv[1:]
+    ]
 
 
 def make_command_callback(command_argv, interp=None, force=False):
@@ -167,6 +243,15 @@ def make_command_callback(command_argv, interp=None, force=False):
         return force or code == 0
 
     return command_callback
+
+
+def quote_argv(argv):
+    try:
+        from shlex import quote
+    except Exception:
+        from pipes import quote
+
+    return " ".join(map(quote, argv))
 
 
 def main():

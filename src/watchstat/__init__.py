@@ -4,13 +4,9 @@ import stat
 import time
 import errno
 
-try:
-    from six.moves import StringIO
-except Exception:
-    from io import StringIO
 
+__version__ = (1, 0, 1)
 
-__version__ = (1, 0)
 
 stat_info = {
     stat.ST_MTIME: ("m", "mtime", "modification time"),
@@ -35,88 +31,6 @@ def _reverse_stat_info(stat_info):
 
 
 rstat_info = _reverse_stat_info(stat_info)
-
-
-def find_tokens(string, delim):
-    """Return an iterator over delim|key|delim tokens in string.
-
-    Each item from the iterator is (offset, key) where offset is the offset
-    of the start of the token in the string. (The end offset of the token can
-    be computed as 'offset + len(key) + 2*len(delim)' if necessary).
-    """
-    delim_length = len(delim)
-    # Start of the next token.
-    delim_offset = string.find(delim)
-    while delim_offset >= 0:
-        # Start of the current token.
-        token_offset = delim_offset
-
-        # Start of the key within the token.
-        key_offset = token_offset + delim_length
-
-        # Find the next delimiter. This ends the token.
-        delim_offset = string.find(delim, key_offset)
-
-        # Error if there is no matching delimiter.
-        if delim_offset < 0:
-            raise ValueError("delimiter mismatch")
-
-        # Extract the key from the string.
-        # Ignore repeated delimiters (empty keys).
-        if delim_offset != key_offset:
-            yield token_offset, string[key_offset:delim_offset]
-
-        # Find the start of the next delimiter pair.
-        delim_offset = string.find(delim, delim_offset + delim_length)
-
-
-def interpolate_argument(string, delim, status, **extra_keys):
-    """Interpolate a single argument string containing delim|X|delim tokens.
-
-    Replaces such tokens with status[F], where F is the field corresponding
-    to the stat key X. The delimiter can be escaped by repeating it.
-
-    Raises ValueError if the string is invalid (i.e. mismatched delimiters).
-    """
-    global rstat_info
-
-    # Result of interpolation.
-    interp = StringIO()
-
-    # Interpolate the string from the delimiters.
-    last_offset = 0
-    for offset, key in find_tokens(string, delim):
-        # Copy the next portion containing no tokens.
-        interp.write(string[last_offset:offset])
-
-        # Interpolate the token.
-        if key:
-            if key.lower() in rstat_info:
-                field = rstat_info[key]
-                interp.write(repr(status[field]))
-            elif key in extra_keys:
-                interp.write(extra_keys[key.lower()])
-            else:
-                raise ValueError("bad stat key {0!r}".format(key))
-
-        # Skip the token.
-        last_offset = offset + len(key) + 2 * len(delim)
-
-    # Copy the final portion containing no tokens.
-    interp.write(string[last_offset:])
-    return interp.getvalue()
-
-
-def interpolate_argument_vector(argv, delim, status, **keys):
-    """Interpolate stat values from argv with args containing delim|X|delim.
-
-    Doesn't interpolate the command name (argv[0]).
-
-    Extra keyword arguments are substituted directly if present.
-    """
-    return [argv[0]] + [
-        interpolate_argument(arg, delim, status, **keys) for arg in argv[1:]
-    ]
 
 
 class Timeout(Exception):
