@@ -23,15 +23,15 @@ class WatchAction(argparse.Action):
         if sopt not in rstat_info:
             raise RuntimeError("bad option for WatchAction")
         stat_index = rstat_info[sopt]
+        stat_field = "st_" + stat_info[stat_index][1]
         path = os.path.realpath(path)
         if path not in watchdict:
             watchdict[path] = list()
-        watchdict[path].append(stat_index)
+        watchdict[path].append(stat_field)
         setattr(ns, self.dest, watchdict)
 
 
 def parse_args(args):
-    global stat_info
     p = argparse.ArgumentParser(
         description="Execute a command whenever a file's status changes.",
         epilog="If no options are selected, default is to watch mtime.",
@@ -255,7 +255,6 @@ def quote_argv(argv):
 
 
 def main():
-    global stat_info
     opts = parse_args(sys.argv[1:])
 
     argv = [opts.command] + (opts.args or [])
@@ -271,7 +270,11 @@ def main():
             # For extra verbosity, dump what differed.
             if opts.verbose > 1:
                 for index in diff_fields:
-                    opt, field, desc = stat_info[index]
+                    try:
+                        opt, field, desc = stat_info[index]
+                    except KeyError:
+                        index = rstat_info[index]
+                        opt, field, desc = stat_info[index]
                     old, new = last_stat[index], next_stat[index]
                     sys.stderr.write(
                         "st_{0} changed from {1!r} to {2!r}\n".format(

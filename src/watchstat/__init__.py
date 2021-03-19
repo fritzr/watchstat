@@ -123,7 +123,7 @@ def watchstat(
 
         for path, fields in watchlist:
             if not fields:
-                fields = (stat.ST_MTIME,)
+                fields = ("st_mtime",)
             next_status = try_stat(path, retry)
             last_status = stats[path]
 
@@ -132,11 +132,16 @@ def watchstat(
                 # See if any status fields differ.
                 diff_fields = set()
                 if last_status is not None:
-                    for field_index in fields:
-                        last_field = last_status[field_index]
-                        next_field = next_status[field_index]
+                    for field_spec in fields:
+                        try:
+                            last_field = last_status[field_spec]
+                            next_field = next_status[field_spec]
+                        except (IndexError, TypeError):
+                            last_field = getattr(last_status, field_spec)
+                            next_field = getattr(next_status, field_spec)
+                            field_spec = field_spec[3:] # strip "st_"
                         if last_field != next_field:
-                            diff_fields.add(field_index)
+                            diff_fields.add(field_spec)
 
                 # Invoke callback if status differs or the path was just created.
                 if last_status is None:
