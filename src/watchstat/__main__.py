@@ -265,7 +265,7 @@ def main():
     callback = command_callback
     if opts.verbose > 0:
 
-        def callback(diff_fields, last_stat, next_stat):
+        def callback(p, diff_fields, last_stat, next_stat):
             sys.stderr.write("running " + quote_argv(argv) + "\n")
 
             # For extra verbosity, dump what differed.
@@ -279,7 +279,7 @@ def main():
                         )
                     )
 
-            result = command_callback(diff_fields, last_stat, next_stat)
+            result = command_callback(p, diff_fields, last_stat, next_stat)
             sys.stderr.write("callback returned {0!r}\n".format(result))
             return result
 
